@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin: 0; background: #0f172a; overflow: hidden; }
+    canvas { width: 100vw; height: 100vh; display: block; }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+  const canvas = document.getElementById('c');
+  const gl = canvas.getContext('webgl');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const vs = `
+    attribute vec3 pos;
+    uniform mat4 mvp;
+    varying float h;
+    void main() {
+      h = pos.y;
+      gl_Position = mvp * vec4(pos, 1.0);
+    }
+  `;
+  const fs = `
+    precision mediump float;
+    varying float h;
+    void main() {
+      gl_FragColor = vec4(0.2, 0.5 + h * 0.1, 0.4, 1.0);
+    }
+  `;
+
+  function createShader(gl, type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, createShader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, createShader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const verts = [];
+  for (let z = -25; z <= 25; z++) {
+    for (let x = -25; x <= 25; x++) {
+      let y = Math.sin(x * 0.2) * Math.cos(z * 0.2) * 2.5;
+      verts.push(x, y, z);
+    }
+  }
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+
+  const posLoc = gl.getAttribLocation(prog, 'pos');
+  gl.enableVertexAttribArray(posLoc);
+  gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
+
+  const mvpLoc = gl.getUniformLocation(prog, 'mvp');
+
+  let angle = 0;
+  function render() {
+    angle += 0.01;
+    gl.clearColor(0.06, 0.09, 0.16, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+
+    let aspect = canvas.width / canvas.height;
+    let rad = angle;
+    let camX = Math.sin(rad) * 40;
+    let camZ = Math.cos(rad) * 40;
+    
+    let mvp = new Float32Array([
+      Math.cos(rad)/aspect, 0, -Math.sin(rad)/aspect, 0,
+      0, 1, 0, -0.02,
+      Math.sin(rad), 0, Math.cos(rad), 0,
+      -camX*0.02, -0.2, -camZ*0.02, 1
+    ]);
+
+    gl.uniformMatrix4fv(mvpLoc, false, mvp);
+    gl.drawArrays(gl.POINTS, 0, verts.length / 3);
+    requestAnimationFrame(render);
+  }
+  render();
+</script>
+</body>
+</html>
